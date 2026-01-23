@@ -159,6 +159,7 @@ def execute_plan(
     added_labels = []
     added_polygons: List[Optional[np.ndarray]] = []
     added_source = []
+    debug_ops: List[Dict[str, object]] = []
 
     for op in plan:
         cls_cfg = config.classes[op.class_name]
@@ -185,6 +186,19 @@ def execute_plan(
                 config.global_cfg.overlay_overlay_max_iou,
             )
             if placement is None:
+                if config.debug:
+                    debug_ops.append(
+                        {
+                            "class_name": op.class_name,
+                            "mode": op.mode,
+                            "asset_file_id": op.asset_file_id,
+                            "placement": None,
+                            "scale": scale,
+                            "hflip": hflip,
+                            "vflip": vflip,
+                            "skipped": "no_placement",
+                        }
+                    )
                 continue
             x0, y0 = placement
             rgba = patch.rgba
@@ -210,6 +224,19 @@ def execute_plan(
                 added_labels.append(cls_cfg.target_class_id)
                 added_polygons.append(poly)
                 added_source.append(1)
+            if config.debug:
+                debug_ops.append(
+                    {
+                        "class_name": op.class_name,
+                        "mode": op.mode,
+                        "asset_file_id": op.asset_file_id,
+                        "placement": (x0, y0),
+                        "scale": scale,
+                        "hflip": hflip,
+                        "vflip": vflip,
+                        "skipped": None,
+                    }
+                )
         else:
             labels = asset.labels
             if not labels:
@@ -231,6 +258,19 @@ def execute_plan(
                     config.global_cfg.overlay_overlay_max_iou,
                 )
                 if placement is None:
+                    if config.debug:
+                        debug_ops.append(
+                            {
+                                "class_name": op.class_name,
+                                "mode": op.mode,
+                                "asset_file_id": op.asset_file_id,
+                                "placement": None,
+                                "scale": scale,
+                                "hflip": hflip,
+                                "vflip": vflip,
+                                "skipped": "no_placement",
+                            }
+                        )
                     continue
                 x0, y0 = placement
                 rgba = patch.rgba
@@ -252,6 +292,19 @@ def execute_plan(
                 added_labels.append(cls_cfg.target_class_id)
                 added_polygons.append(poly)
                 added_source.append(1)
+                if config.debug:
+                    debug_ops.append(
+                        {
+                            "class_name": op.class_name,
+                            "mode": op.mode,
+                            "asset_file_id": op.asset_file_id,
+                            "placement": (x0, y0),
+                            "scale": scale,
+                            "hflip": hflip,
+                            "vflip": vflip,
+                            "skipped": None,
+                        }
+                    )
 
     if added_boxes:
         merged_boxes = np.concatenate([instances.boxes_xyxy, np.stack(added_boxes)], axis=0)
@@ -291,5 +344,5 @@ def execute_plan(
     )
     debug = None
     if config.debug:
-        debug = {"num_overlays": len(added_boxes), "plan_ops": len(plan)}
+        debug = {"num_overlays": len(added_boxes), "plan_ops": len(plan), "ops": debug_ops}
     return out, merged, debug

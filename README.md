@@ -40,9 +40,11 @@ Label files can be either:
 ## Configuration
 
 SpatterAug uses a YAML/JSON config that describes which asset classes to paste, how often, and how to
-place them. A minimal YAML file looks like this:
+place them. Add `preset: simple_overlay` to opt into friendlier defaults (like `apply.p=1.0` and
+`assets_dir` defaulting to the class name). A minimal YAML file looks like this:
 
 ```yaml
+preset: simple_overlay
 seed: 12345
 global:
   strategy: independent
@@ -74,6 +76,14 @@ classes:
       strategy: uniform_in_bounds
 ```
 
+With the preset enabled, you can also use a shorthand class definition:
+
+```yaml
+preset: simple_overlay
+classes:
+  helmet: 2  # assets_dir defaults to "helmet"
+```
+
 - `target_class_id` is the class id in your **training dataset** (not the asset labels).
 - `assets_dir` is the subdirectory under the assets root.
 - `apply.p` controls the probability of pasting that class on a given sample.
@@ -95,7 +105,7 @@ import numpy as np
 from spatteraug import AssetStore, SpatterAugmentor
 
 assets = AssetStore("/path/to/assets")
-augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
+augmentor = SpatterAugmentor("/path/to/config.yaml", assets, enabled=True)
 
 image = np.zeros((720, 1280, 3), dtype=np.uint8)
 # DETR-style target (boxes in xyxy pixels)
@@ -105,6 +115,27 @@ target = {
 }
 
 aug_image, aug_target, debug = augmentor(image, target, index=0)
+```
+
+You can toggle augmentation at runtime (for example, after a warmup epoch):
+
+```python
+augmentor.set_enabled(False)
+```
+
+### Convenience wrappers
+
+If you want fewer moving pieces, use the integration helpers to build the asset store, augmentor,
+and dataset wrapper in one call.
+
+```python
+from spatteraug import wrap_dataset
+
+aug_dataset = wrap_dataset(
+    base_dataset,
+    assets_root="/path/to/assets",
+    config="/path/to/config.yaml",
+)
 ```
 
 ### SpatterAugmentedDataset
@@ -129,6 +160,7 @@ aug_dataset = SpatterAugmentedDataset(
 Supported adapters:
 - `detr`: `{"boxes": xyxy_px, "labels": class_ids}`
 - `yolo`: `{"bboxes": xywh_norm, "labels": class_ids, "polygons": optional}`
+- `auto`: infer from keys in the target dict
 
 ## Ultralytics YOLOv8 integration
 
@@ -330,4 +362,17 @@ it `aug_dataset` directly (since it implements `__len__` and `__getitem__`).
 
 ```bash
 pytest
+```
+
+## Asset validation
+
+You can run basic asset checks (missing labels, RGBA format, empty labels) via the store:
+
+```python
+from spatteraug import AssetStore
+
+assets = AssetStore("/path/to/assets")
+issues = assets.validate()
+if issues:
+    print("\n".join(issues))
 ```
