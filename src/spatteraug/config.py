@@ -98,7 +98,7 @@ class ClassConfig:
 
 
 @dataclass
-class OverlayAugConfig:
+class SpatterAugConfig:
     seed: int = 12345
     global_cfg: GlobalConfig = field(default_factory=GlobalConfig)
     occlusion_default: OcclusionConfig = field(default_factory=OcclusionConfig)
@@ -121,7 +121,7 @@ def _parse_dist(cfg: Dict[str, Any]):
     return cls(**params)
 
 
-def load_config(config: Dict[str, Any] | str) -> OverlayAugConfig:
+def load_config(config: Dict[str, Any] | str) -> SpatterAugConfig:
     if isinstance(config, str):
         with open(config, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
@@ -166,7 +166,7 @@ def load_config(config: Dict[str, Any] | str) -> OverlayAugConfig:
         )
         classes_cfg[name] = class_config
 
-    return OverlayAugConfig(
+    return SpatterAugConfig(
         seed=seed,
         global_cfg=global_cfg,
         occlusion_default=occlusion_default,

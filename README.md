@@ -1,6 +1,6 @@
-# OverlayAug
+# SpatterAug
 
-OverlayAug is an occlusion-aware overlay augmentation library for PyTorch detection training. It provides
+SpatterAug is an occlusion-aware overlay augmentation library for PyTorch detection training. It provides
 reproducible overlay placement, asset management, compositing, and adapter utilities so you can augment
 existing datasets without rewriting your training loop.
 
@@ -10,7 +10,7 @@ existing datasets without rewriting your training loop.
 pip install -e .
 ```
 
-OverlayAug uses `numpy`, `opencv-python`, and `pyyaml`. Make sure OpenCV has PNG alpha support
+SpatterAug uses `numpy`, `opencv-python`, and `pyyaml`. Make sure OpenCV has PNG alpha support
 (`opencv-python` includes it by default).
 
 ## Asset layout
@@ -39,7 +39,7 @@ Label files can be either:
 
 ## Configuration
 
-OverlayAug uses a YAML/JSON config that describes which asset classes to paste, how often, and how to
+SpatterAug uses a YAML/JSON config that describes which asset classes to paste, how often, and how to
 place them. A minimal YAML file looks like this:
 
 ```yaml
@@ -83,19 +83,19 @@ classes:
 ### AssetStore
 
 ```python
-from overlayaug import AssetStore
+from spatteraug import AssetStore
 
 assets = AssetStore("/path/to/assets", preload_images=True)
 ```
 
-### OverlayAugmentor
+### SpatterAugmentor
 
 ```python
 import numpy as np
-from overlayaug import AssetStore, OverlayAugmentor
+from spatteraug import AssetStore, SpatterAugmentor
 
 assets = AssetStore("/path/to/assets")
-augmentor = OverlayAugmentor("/path/to/config.yaml", assets)
+augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
 
 image = np.zeros((720, 1280, 3), dtype=np.uint8)
 # DETR-style target (boxes in xyxy pixels)
@@ -107,18 +107,18 @@ target = {
 aug_image, aug_target, debug = augmentor(image, target, index=0)
 ```
 
-### OverlayAugmentedDataset
+### SpatterAugmentedDataset
 
 Wrap an existing dataset that yields `(image, target)` pairs. Use the built-in adapters to convert
-between the dataset label format and OverlayAug's internal `Instances`.
+between the dataset label format and SpatterAug's internal `Instances`.
 
 ```python
-from overlayaug import AssetStore, OverlayAugmentor, OverlayAugmentedDataset
+from spatteraug import AssetStore, SpatterAugmentor, SpatterAugmentedDataset
 
 assets = AssetStore("/path/to/assets")
-augmentor = OverlayAugmentor("/path/to/config.yaml", assets)
+augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
 
-aug_dataset = OverlayAugmentedDataset(
+aug_dataset = SpatterAugmentedDataset(
     base_dataset,
     augmentor,
     adapter_in="detr",
@@ -137,7 +137,7 @@ Ultralytics datasets expose YOLO-style labels. The example below maps Ultralytic
 
 ```python
 from ultralytics.data.dataset import YOLODataset
-from overlayaug import AssetStore, OverlayAugmentor, OverlayAugmentedDataset
+from spatteraug import AssetStore, SpatterAugmentor, SpatterAugmentedDataset
 
 base_dataset = YOLODataset(
     data="data.yaml",
@@ -149,7 +149,7 @@ base_dataset = YOLODataset(
 )
 ```
 
-You can then wrap `base_dataset` with `OverlayAugmentedDataset` and use it inside a custom training
+You can then wrap `base_dataset` with `SpatterAugmentedDataset` and use it inside a custom training
 loop or by overriding the Ultralytics trainer dataloader. The adapter expects normalized `xywh` boxes
 and integer class labels.
 
@@ -160,12 +160,12 @@ with the `detr` adapters so the output stays compatible with RF-DETR. A boilerpl
 `examples/detr_integration.py`.
 
 ```python
-from overlayaug import AssetStore, OverlayAugmentor, OverlayAugmentedDataset
+from spatteraug import AssetStore, SpatterAugmentor, SpatterAugmentedDataset
 
 assets = AssetStore("/path/to/assets")
-augmentor = OverlayAugmentor("/path/to/config.yaml", assets)
+augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
 
-aug_dataset = OverlayAugmentedDataset(
+aug_dataset = SpatterAugmentedDataset(
     rfdetr_dataset,
     augmentor,
     adapter_in="detr",

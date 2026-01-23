@@ -3,12 +3,12 @@ requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "overlayaug"
+name = "spatteraug"
 version = "0.1.0"
 description = "Occlusion-aware overlay augmentation for PyTorch detection training."
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [{name = "OverlayAug Contributors"}]
+authors = [{name = "SpatterAug Contributors"}]
 license = {text = "MIT"}
 dependencies = [
   "numpy>=1.23",

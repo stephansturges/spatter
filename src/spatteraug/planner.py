@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from .config import ClassConfig, OverlayAugConfig
+from .config import ClassConfig, SpatterAugConfig
 from .geometry import Instances
 
 
@@ -44,7 +44,7 @@ def _select_mode(mode_cfg: ClassConfig, rng: np.random.Generator) -> str:
 
 def build_plan(
     rng: np.random.Generator,
-    config: OverlayAugConfig,
+    config: SpatterAugConfig,
     instances: Instances,
     class_file_counts: Dict[str, int],
 ) -> List[PasteOp]:

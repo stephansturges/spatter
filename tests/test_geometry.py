@@ -1,6 +1,6 @@
 import numpy as np
 
-from overlayaug.geometry import flip_boxes, scale_boxes, translate_boxes
+from spatteraug.geometry import flip_boxes, scale_boxes, translate_boxes
 
 
 def test_scale_boxes():
