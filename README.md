@@ -133,7 +133,9 @@ Supported adapters:
 ## Ultralytics YOLOv8 integration
 
 Ultralytics datasets expose YOLO-style labels. The example below maps Ultralytics label dicts to the
-`yolo` adapter format and back. See the full example in `examples/yolo_integration.py`.
+`yolo` adapter format and back. See the full example in `examples/yolo_integration.py`. The goal is
+to keep the rest of the Ultralytics training loop untouched while swapping the dataset for the
+SpatterAug wrapper.
 
 ```python
 from ultralytics.data.dataset import YOLODataset
@@ -149,9 +151,95 @@ base_dataset = YOLODataset(
 )
 ```
 
-You can then wrap `base_dataset` with `SpatterAugmentedDataset` and use it inside a custom training
-loop or by overriding the Ultralytics trainer dataloader. The adapter expects normalized `xywh` boxes
-and integer class labels.
+### Step-by-step
+
+1. **Create the augmentor.** Point to your assets directory (PNG masks/textures) and a config file.
+2. **Wrap the Ultralytics dataset** so labels match SpatterAug's YOLO adapter schema.
+3. **Wrap the adapted dataset** with `SpatterAugmentedDataset`.
+4. **Swap the Ultralytics train loader** (or use a custom loop) so training pulls from SpatterAug.
+
+The adapter expects normalized `xywh` boxes and integer class labels. Ultralytics already stores
+`label["bboxes"]` in normalized `xywh`, and `label["cls"]` as class ids, so the adapter is mostly a
+field rename.
+
+```python
+from ultralytics.data.dataset import YOLODataset
+from spatteraug import AssetStore, SpatterAugmentor, SpatterAugmentedDataset
+
+assets = AssetStore("/path/to/assets")
+augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
+
+base_dataset = YOLODataset(
+    data="data.yaml",
+    imgsz=640,
+    augment=False,
+    rect=False,
+    cache=False,
+    prefix="",
+)
+
+class UltralyticsLabelAdapterDataset:
+    def __init__(self, base_dataset: YOLODataset) -> None:
+        self.base_dataset = base_dataset
+
+    def __len__(self) -> int:
+        return len(self.base_dataset)
+
+    def __getitem__(self, index):
+        image, label = self.base_dataset[index]
+        target = {
+            "bboxes": label["bboxes"],  # normalized xywh
+            "labels": label["cls"].astype("int64"),
+            "polygons": label.get("segments"),
+        }
+        return image, target
+
+def to_ultralytics(image, target):
+    return image, {
+        "bboxes": target["bboxes"],
+        "cls": target["labels"],
+        "segments": target.get("polygons"),
+    }
+
+wrapped_dataset = UltralyticsLabelAdapterDataset(base_dataset)
+
+aug_dataset = SpatterAugmentedDataset(
+    wrapped_dataset,
+    augmentor,
+    adapter_in="yolo",
+    adapter_out="yolo",
+    post_transform=to_ultralytics,
+)
+```
+
+### Minimal trainer wiring in a YOLOv8 repo
+
+If you are inside the Ultralytics repo (or a project using `YOLO(...)`), override the trainer's
+`train_loader` so everything else (model creation, loss, hooks) stays the same. This is intentionally
+minimal so you can drop it into a script or notebook:
+
+```python
+from torch.utils.data import DataLoader
+from ultralytics import YOLO
+
+train_loader = DataLoader(
+    aug_dataset,
+    batch_size=16,
+    shuffle=True,
+    num_workers=4,
+    collate_fn=base_dataset.collate_fn,
+)
+
+model = YOLO("yolov8n.pt")
+trainer = model.trainer(overrides={"data": "data.yaml", "epochs": 50})
+trainer.train_loader = train_loader
+trainer.train()
+```
+
+**Checklist when wiring YOLOv8:**
+- Confirm `label["bboxes"]` are normalized `xywh` (Ultralytics default).
+- Ensure `label["cls"]` is `int64`.
+- Keep Ultralytics' `collate_fn` so batch formatting stays compatible.
 
 ## Roboflow RF-DETR integration
 
@@ -172,6 +260,65 @@ aug_dataset = SpatterAugmentedDataset(
     adapter_out="detr",
 )
 ```
+
+### Step-by-step
+
+1. **Create your RF-DETR dataset** so it yields `(image, target)` with:
+   - `target["boxes"]`: `[N, 4]` in `xyxy` pixel coordinates.
+   - `target["labels"]`: `[N]` integer class ids.
+   - Optional `target["polygons"]`: list of polygons if you have segmentation.
+2. **Wrap with `SpatterAugmentedDataset`** using `adapter_in="detr"` and `adapter_out="detr"`.
+3. **Use a DETR-style collate function** that returns `list[images], list[targets]`.
+4. **Feed that loader into RF-DETR's trainer** (or your custom loop).
+
+```python
+from torch.utils.data import DataLoader
+from spatteraug import AssetStore, SpatterAugmentor, SpatterAugmentedDataset
+
+def collate_fn(batch):
+    images, targets = zip(*batch)
+    return list(images), list(targets)
+
+assets = AssetStore("/path/to/assets")
+augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
+
+base_dataset = ...  # your RF-DETR dataset
+
+aug_dataset = SpatterAugmentedDataset(
+    base_dataset,
+    augmentor,
+    adapter_in="detr",
+    adapter_out="detr",
+)
+
+train_loader = DataLoader(
+    aug_dataset,
+    batch_size=2,
+    shuffle=True,
+    num_workers=4,
+    collate_fn=collate_fn,
+)
+```
+
+### Minimal wiring in an RF-DETR repo
+
+RF-DETR training code varies by release, but the core idea is to pass the loader you created above
+into the trainer or training loop. If your RF-DETR entrypoint expects a dataset object, you can hand
+it `aug_dataset` directly (since it implements `__len__` and `__getitem__`).
+
+```python
+# Pseudocode: update for your RF-DETR version.
+# from rfdetr import RFDETR, RFDETRTrainer
+
+# model = RFDETR(num_classes=base_dataset.num_classes)
+# trainer = RFDETRTrainer(model=model, train_loader=train_loader)
+# trainer.train(epochs=50)
+```
+
+**Checklist when wiring RF-DETR:**
+- Keep `boxes` in absolute pixel `xyxy` coordinates.
+- Ensure `labels` are integer class ids.
+- Use a collate function that returns lists (DETR-style).
 
 ## Examples
 
