@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from torch.utils.data import DataLoader
 
-from overlayaug import AssetStore, OverlayAugmentor, OverlayAugmentedDataset
+from spatteraug import AssetStore, SpatterAugmentor, SpatterAugmentedDataset
 
 
 def collate_fn(batch):
@@ -22,13 +22,13 @@ def collate_fn(batch):
 
 def main() -> None:
     assets = AssetStore("/path/to/assets")
-    augmentor = OverlayAugmentor("/path/to/config.yaml", assets)
+    augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
 
     # base_dataset should yield (image, target) with DETR-style keys.
     # Replace this with your Roboflow dataset builder.
     base_dataset = ...  # e.g., RoboflowDataset(root="/path/to/data")
 
-    aug_dataset = OverlayAugmentedDataset(
+    aug_dataset = SpatterAugmentedDataset(
         base_dataset,
         augmentor,
         adapter_in="detr",

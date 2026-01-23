@@ -1,6 +1,6 @@
 import numpy as np
 
-from overlayaug.occlusion import bbox_covered_fraction
+from spatteraug.occlusion import bbox_covered_fraction
 
 
 def test_bbox_covered_fraction():

@@ -1,6 +1,6 @@
 """Ultralytics YOLOv8 integration example.
 
-This script shows how to wrap an Ultralytics dataset so OverlayAug can operate on
+This script shows how to wrap an Ultralytics dataset so SpatterAug can operate on
 YOLO-format labels (normalized xywh). Adjust paths, class counts, and trainer
 settings to match your project.
 """
@@ -14,11 +14,11 @@ from torch.utils.data import DataLoader
 from ultralytics import YOLO
 from ultralytics.data.dataset import YOLODataset
 
-from overlayaug import AssetStore, OverlayAugmentor, OverlayAugmentedDataset
+from spatteraug import AssetStore, SpatterAugmentor, SpatterAugmentedDataset
 
 
 class UltralyticsLabelAdapterDataset:
-    """Convert Ultralytics label dicts to OverlayAug's YOLO adapter format."""
+    """Convert Ultralytics label dicts to SpatterAug's YOLO adapter format."""
 
     def __init__(self, base_dataset: YOLODataset) -> None:
         self.base_dataset = base_dataset
@@ -37,7 +37,7 @@ class UltralyticsLabelAdapterDataset:
 
 
 def to_ultralytics(image: np.ndarray, target: Dict[str, Any]):
-    """Convert OverlayAug targets back to Ultralytics format."""
+    """Convert SpatterAug targets back to Ultralytics format."""
     label = {
         "bboxes": target["bboxes"],
         "cls": target["labels"],
@@ -48,7 +48,7 @@ def to_ultralytics(image: np.ndarray, target: Dict[str, Any]):
 
 def main() -> None:
     assets = AssetStore("/path/to/assets")
-    augmentor = OverlayAugmentor("/path/to/config.yaml", assets)
+    augmentor = SpatterAugmentor("/path/to/config.yaml", assets)
 
     base_dataset = YOLODataset(
         data="data.yaml",
@@ -60,7 +60,7 @@ def main() -> None:
     )
     wrapped_dataset = UltralyticsLabelAdapterDataset(base_dataset)
 
-    aug_dataset = OverlayAugmentedDataset(
+    aug_dataset = SpatterAugmentedDataset(
         wrapped_dataset,
         augmentor,
         adapter_in="yolo",

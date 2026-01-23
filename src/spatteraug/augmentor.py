@@ -5,15 +5,15 @@ from typing import Optional, Tuple
 import numpy as np
 
 from .assets import AssetStore
-from .config import OverlayAugConfig, load_config
+from .config import SpatterAugConfig, load_config
 from .executor import execute_plan
 from .geometry import Instances
 from .planner import build_plan
 
 
-class OverlayAugmentor:
+class SpatterAugmentor:
     def __init__(self, config: dict | str, asset_store: AssetStore) -> None:
-        self.config: OverlayAugConfig = load_config(config)
+        self.config: SpatterAugConfig = load_config(config)
         self.asset_store = asset_store
         self._epoch = 0
         self._rank = 0

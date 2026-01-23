@@ -1,8 +1,8 @@
 import numpy as np
 
-from overlayaug.config import load_config
-from overlayaug.geometry import empty_instances
-from overlayaug.planner import build_plan
+from spatteraug.config import load_config
+from spatteraug.geometry import empty_instances
+from spatteraug.planner import build_plan
 
 
 def _config():

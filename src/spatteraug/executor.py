@@ -8,7 +8,7 @@ import numpy as np
 
 from .assets import AssetLabel, AssetStore
 from .composite import blend_roi, clip_patch, compute_iou, update_coverage
-from .config import ClassConfig, OverlayAugConfig
+from .config import ClassConfig, SpatterAugConfig
 from .geometry import (
     Instances,
     boxes_from_polygons,
@@ -143,7 +143,7 @@ def _sample_placement(
 
 def execute_plan(
     rng: np.random.Generator,
-    config: OverlayAugConfig,
+    config: SpatterAugConfig,
     asset_store: AssetStore,
     image: np.ndarray,
     instances: Instances,

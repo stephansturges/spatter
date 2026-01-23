@@ -1,6 +1,6 @@
 import numpy as np
 
-from overlayaug.composite import blend_roi
+from spatteraug.composite import blend_roi
 
 
 def test_blend_roi_simple():

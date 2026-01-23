@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from .augmentor import OverlayAugmentor
+from .augmentor import SpatterAugmentor
 from .adapters.detr import from_instances as detr_from_instances, to_instances as detr_to_instances
 from .adapters.yolo import from_instances as yolo_from_instances, to_instances as yolo_to_instances
 
 
-class OverlayAugmentedDataset:
+class SpatterAugmentedDataset:
     def __init__(
         self,
         base_dataset,
-        augmentor: OverlayAugmentor,
+        augmentor: SpatterAugmentor,
         adapter_in: str,
         adapter_out: str,
         post_transform: Optional[Callable[[Any, Any], Any]] = None,
