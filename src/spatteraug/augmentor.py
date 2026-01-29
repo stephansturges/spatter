@@ -15,6 +15,9 @@ class SpatterAugmentor:
     def __init__(self, config: dict | str, asset_store: AssetStore) -> None:
         self.config: SpatterAugConfig = load_config(config)
         self.asset_store = asset_store
+        self._class_file_counts = {
+            name: self.asset_store.file_count(name) for name in self.asset_store.classes()
+        }
         self._epoch = 0
         self._rank = 0
 
@@ -59,7 +62,7 @@ class SpatterAugmentor:
             rng,
             self.config,
             instances,
-            {name: self.asset_store.file_count(name) for name in self.asset_store.classes()},
+            self._class_file_counts,
         )
         out_image, out_instances, debug = execute_plan(
             rng,
