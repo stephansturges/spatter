@@ -188,14 +188,20 @@ def execute_plan(
                 continue
             x0, y0 = placement
             rgba = patch.rgba
+            crop_dx = 0
+            crop_dy = 0
             if cls_cfg.placement.allow_out_of_bounds:
+                old_x0, old_y0 = x0, y0
                 rgba, x0, y0 = clip_patch(rgba, x0, y0, base_w, base_h)
+                crop_dx = x0 - old_x0
+                crop_dy = y0 - old_y0
                 if rgba.size == 0:
                     continue
             blend_roi(out, rgba, x0, y0)
             if coverage is not None:
                 update_coverage(coverage, rgba[..., 3], x0, y0, config.occlusion_default.alpha_threshold)
             overlay_boxes.append(np.array([x0, y0, x0 + rgba.shape[1], y0 + rgba.shape[0]], dtype=np.float32))
+            patch_h, patch_w = rgba.shape[:2]
             for label in asset.labels:
                 bbox = label.bbox.copy().astype(np.float32)
                 poly = label.polygon.copy().astype(np.float32) if label.polygon is not None else None
@@ -203,6 +209,12 @@ def execute_plan(
                     bbox = scale_boxes(bbox[None, :], scale)[0]
                     poly_list = scale_polygons([poly], scale)
                     poly = poly_list[0]
+                bbox = flip_boxes(bbox[None, :], patch_w, patch_h, hflip, vflip)[0]
+                poly = flip_polygons([poly], patch_w, patch_h, hflip, vflip)[0]
+                if crop_dx != 0 or crop_dy != 0:
+                    bbox = translate_boxes(bbox[None, :], -crop_dx, -crop_dy)[0]
+                    if poly is not None:
+                        poly = translate_polygons([poly], -crop_dx, -crop_dy)[0]
                 bbox = translate_boxes(bbox[None, :], x0, y0)[0]
                 if poly is not None:
                     poly = translate_polygons([poly], x0, y0)[0]
@@ -214,7 +226,9 @@ def execute_plan(
             labels = asset.labels
             if not labels:
                 continue
-            k = min(len(labels), max(1, len(op.asset_instance_ids)))
+            k = min(len(labels), len(op.asset_instance_ids))
+            if k <= 0:
+                continue
             instance_ids = rng.choice(len(labels), size=k, replace=False)
             for idx in instance_ids:
                 patch = _extract_patch(image_rgba, labels[int(idx)], cls_cfg)
@@ -236,11 +250,18 @@ def execute_plan(
                 rgba = patch.rgba
                 poly = patch.polygon
                 bbox = patch.bbox
+                crop_dx = 0
+                crop_dy = 0
                 if cls_cfg.placement.allow_out_of_bounds:
+                    old_x0, old_y0 = x0, y0
                     rgba, x0, y0 = clip_patch(rgba, x0, y0, base_w, base_h)
+                    crop_dx = x0 - old_x0
+                    crop_dy = y0 - old_y0
                     if rgba.size == 0:
                         continue
                     poly = None
+                if crop_dx != 0 or crop_dy != 0:
+                    bbox = translate_boxes(bbox[None, :], -crop_dx, -crop_dy)[0]
                 blend_roi(out, rgba, x0, y0)
                 if coverage is not None:
                     update_coverage(coverage, rgba[..., 3], x0, y0, config.occlusion_default.alpha_threshold)

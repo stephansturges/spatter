@@ -79,7 +79,9 @@ def build_plan(
                 k_dist = cls_cfg.intensity.k_instances_per_file
                 if k_dist is None:
                     continue
-                k = k_dist.sample(rng)
+                k = max(0, k_dist.sample(rng))
+                if k == 0:
+                    continue
                 instance_ids = list(range(k))
                 ops.append(
                     PasteOp(
