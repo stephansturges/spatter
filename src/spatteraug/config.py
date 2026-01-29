@@ -117,9 +117,16 @@ SIMPLE_PRESET = "simple_overlay"
 def _normalize_class_config(name: str, cls_cfg: Any, preset: Optional[str]) -> Dict[str, Any]:
     if isinstance(cls_cfg, int):
         cls_cfg = {"target_class_id": cls_cfg}
+    if isinstance(cls_cfg, list):
+        raise ValueError("Class config must be dict or int, not list")
     if not isinstance(cls_cfg, dict):
         raise ValueError(f"Class config for {name} must be dict or int")
     normalized = dict(cls_cfg)
+    if "target_class_id" not in normalized:
+        for alias in ("target", "class_id"):
+            if alias in normalized:
+                normalized["target_class_id"] = normalized[alias]
+                break
     if "assets_dir" not in normalized:
         normalized["assets_dir"] = name
     if preset == SIMPLE_PRESET and "apply" not in normalized:
@@ -144,11 +151,28 @@ def _validate_config(config: Dict[str, Any], classes_cfg: Dict[str, ClassConfig]
         errors.append("No classes configured")
     for name, cls_cfg in classes_cfg.items():
         if cls_cfg.assets_dir is None:
-            errors.append(f"Class {name} missing assets_dir")
+            errors.append(f"Class {name} missing assets_dir (add: assets_dir: <folder>)")
         if cls_cfg.target_class_id is None:
-            errors.append(f"Class {name} missing target_class_id")
+            errors.append(f"Class {name} missing target_class_id (add: target_class_id: <dataset class id>)")
         if cls_cfg.mode.type == "mixed" and not cls_cfg.mode.mixed_weights:
             errors.append(f"Class {name} mode=mixed requires mixed_weights")
+        if cls_cfg.mode.type not in {"whole_file", "instance", "mixed"}:
+            errors.append(f"Class {name} has invalid mode.type={cls_cfg.mode.type!r}")
+        if cls_cfg.placement.strategy not in {"uniform_in_bounds"}:
+            errors.append(f"Class {name} has invalid placement.strategy={cls_cfg.placement.strategy!r}")
+    global_cfg = config.get("global", {})
+    if global_cfg:
+        strategy = global_cfg.get("strategy")
+        if strategy and strategy not in {"independent", "budgeted"}:
+            errors.append(f"Invalid global.strategy={strategy!r}")
+    occlusion_default = config.get("occlusion_default", {})
+    if occlusion_default:
+        metric = occlusion_default.get("metric")
+        scope = occlusion_default.get("scope")
+        if metric and metric not in {"alpha_in_bbox", "alpha_in_polygon", "ioa_bbox"}:
+            errors.append(f"Invalid occlusion_default.metric={metric!r}")
+        if scope and scope not in {"base_only", "all"}:
+            errors.append(f"Invalid occlusion_default.scope={scope!r}")
     if errors:
         raise ValueError("Invalid config:\n- " + "\n- ".join(errors))
 
@@ -170,6 +194,14 @@ def load_config(config: Dict[str, Any] | str) -> SpatterAugConfig:
     classes = config.get("classes", {})
     if not classes:
         raise ValueError("Config must include classes")
+
+    if isinstance(classes, list):
+        class_map: Dict[str, Any] = {}
+        for cfg in classes:
+            if not isinstance(cfg, dict) or "name" not in cfg:
+                raise ValueError("Class list entries must be dicts with a name field")
+            class_map[cfg["name"]] = cfg
+        classes = class_map
 
     for name, cls_cfg in classes.items():
         cls_cfg = _normalize_class_config(name, cls_cfg, preset)

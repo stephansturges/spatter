@@ -124,19 +124,34 @@ class AssetStore:
                     labels.append(AssetLabel(bbox=bbox, polygon=polygon))
         return labels
 
-    def validate(self) -> List[str]:
+    def validate(self, full: bool = True) -> List[str]:
         issues: List[str] = []
         for class_name, files in self.class_files.items():
             for idx, asset in enumerate(files):
                 if not asset.label_path.exists():
                     issues.append(f"{class_name}/{asset.image_path.name}: missing label file")
-                try:
-                    image = self.load_image(class_name, idx)
-                except Exception as exc:
-                    issues.append(f"{class_name}/{asset.image_path.name}: {exc}")
-                    continue
-                if image.ndim != 3 or image.shape[2] != 4:
-                    issues.append(f"{class_name}/{asset.image_path.name}: not RGBA")
+                if full:
+                    try:
+                        image = self.load_image(class_name, idx)
+                    except Exception as exc:
+                        issues.append(f"{class_name}/{asset.image_path.name}: {exc}")
+                        continue
+                    if image.ndim != 3 or image.shape[2] != 4:
+                        issues.append(f"{class_name}/{asset.image_path.name}: not RGBA")
                 if not asset.labels and asset.label_path.exists():
                     issues.append(f"{class_name}/{asset.label_path.name}: empty label file")
         return issues
+
+    def stats(self) -> Dict[str, Dict[str, float]]:
+        stats: Dict[str, Dict[str, float]] = {}
+        for class_name, files in self.class_files.items():
+            total_labels = sum(len(asset.labels) for asset in files)
+            total_polygons = sum(
+                1 for asset in files for label in asset.labels if label.polygon is not None
+            )
+            stats[class_name] = {
+                "files": float(len(files)),
+                "labels": float(total_labels),
+                "polygon_labels": float(total_polygons),
+            }
+        return stats

@@ -15,6 +15,7 @@ def wrap_dataset(
     adapter_in: str | Callable[[Any, int, int], Any] = "auto",
     adapter_out: str | Callable[[Any, int, int], Any] = "auto",
     post_transform: Optional[Callable[[Any, Any], Any]] = None,
+    prefer_adapter: Optional[str] = None,
     preload_images: bool = True,
     enabled: bool = True,
 ) -> SpatterAugmentedDataset:
@@ -26,6 +27,7 @@ def wrap_dataset(
         adapter_in=adapter_in,
         adapter_out=adapter_out,
         post_transform=post_transform,
+        prefer_adapter=prefer_adapter,
     )
 
 

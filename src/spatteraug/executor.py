@@ -120,8 +120,11 @@ def _sample_placement(
     overlay_boxes: List[np.ndarray],
     allow_overlap: bool,
     max_iou: float,
-) -> Optional[Tuple[int, int]]:
+) -> Tuple[Optional[Tuple[int, int]], Optional[str]]:
     h, w = patch.rgba.shape[:2]
+    if not cfg.placement.allow_out_of_bounds and (w >= base_w or h >= base_h):
+        return None, "too_large"
+    last_reason = None
     for _ in range(cfg.placement.max_tries):
         if cfg.placement.strategy != "uniform_in_bounds":
             raise ValueError("Only uniform_in_bounds supported")
@@ -129,16 +132,15 @@ def _sample_placement(
             x0 = int(rng.integers(-w + 1, base_w))
             y0 = int(rng.integers(-h + 1, base_h))
         else:
-            if w >= base_w or h >= base_h:
-                return None
             x0 = int(rng.integers(cfg.placement.margin_px, base_w - w - cfg.placement.margin_px + 1))
             y0 = int(rng.integers(cfg.placement.margin_px, base_h - h - cfg.placement.margin_px + 1))
         candidate_box = np.array([x0, y0, x0 + w, y0 + h], dtype=np.float32)
         if allow_overlap or not overlay_boxes:
-            return x0, y0
+            return (x0, y0), None
         if all(compute_iou(candidate_box, box) <= max_iou for box in overlay_boxes):
-            return x0, y0
-    return None
+            return (x0, y0), None
+        last_reason = "overlap_rejected"
+    return None, last_reason or "max_tries_exceeded"
 
 
 def execute_plan(
@@ -175,7 +177,7 @@ def execute_plan(
                     hflip,
                     vflip,
                 )
-            placement = _sample_placement(
+            placement, skip_reason = _sample_placement(
                 rng,
                 patch,
                 base_w,
@@ -196,7 +198,7 @@ def execute_plan(
                             "scale": scale,
                             "hflip": hflip,
                             "vflip": vflip,
-                            "skipped": "no_placement",
+                            "skipped": skip_reason or "no_placement",
                         }
                     )
                 continue
@@ -247,7 +249,7 @@ def execute_plan(
                 patch = _extract_patch(image_rgba, labels[int(idx)], cls_cfg)
                 scale, hflip, vflip = _sample_transform(cls_cfg, rng)
                 patch = _apply_transform(patch, scale, hflip, vflip)
-                placement = _sample_placement(
+                placement, skip_reason = _sample_placement(
                     rng,
                     patch,
                     base_w,
@@ -268,7 +270,7 @@ def execute_plan(
                                 "scale": scale,
                                 "hflip": hflip,
                                 "vflip": vflip,
-                                "skipped": "no_placement",
+                                "skipped": skip_reason or "no_placement",
                             }
                         )
                     continue
