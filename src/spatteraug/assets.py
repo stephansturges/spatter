@@ -42,16 +42,19 @@ class AssetStore:
             if not images_dir.exists() or not labels_dir.exists():
                 continue
             files: List[AssetFile] = []
-            for image_path in sorted(images_dir.glob("*.png")):
+            for image_idx, image_path in enumerate(sorted(images_dir.glob("*.png"))):
                 label_path = labels_dir / f"{image_path.stem}.txt"
-                labels = self._load_labels(label_path, image_path)
+                image = None
+                if self.preload_images:
+                    image = self._read_image(image_path)
+                    self._image_cache[(class_dir.name, image_idx)] = image
+                labels = self._load_labels(label_path, image_path, image=image)
                 files.append(AssetFile(image_path=image_path, label_path=label_path, labels=labels))
             self.class_files[class_dir.name] = files
-
-        if self.preload_images:
-            for class_name, files in self.class_files.items():
+            if self.preload_images:
                 for idx, asset in enumerate(files):
-                    self._image_cache[(class_name, idx)] = self._read_image(asset.image_path)
+                    if (class_dir.name, idx) not in self._image_cache:
+                        self._image_cache[(class_dir.name, idx)] = self._read_image(asset.image_path)
 
     def classes(self) -> List[str]:
         return list(self.class_files.keys())
@@ -79,11 +82,14 @@ class AssetStore:
             raise ValueError(f"Asset image must be RGBA: {path}")
         return cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA)
 
-    def _load_labels(self, label_path: Path, image_path: Path) -> List[AssetLabel]:
+    def _load_labels(
+        self, label_path: Path, image_path: Path, image: Optional[np.ndarray] = None
+    ) -> List[AssetLabel]:
         if not label_path.exists():
             return []
-        img = self._read_image(image_path)
-        h, w = img.shape[:2]
+        if image is None:
+            image = self._read_image(image_path)
+        h, w = image.shape[:2]
         labels: List[AssetLabel] = []
         with open(label_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -117,3 +123,35 @@ class AssetStore:
                     )
                     labels.append(AssetLabel(bbox=bbox, polygon=polygon))
         return labels
+
+    def validate(self, full: bool = True) -> List[str]:
+        issues: List[str] = []
+        for class_name, files in self.class_files.items():
+            for idx, asset in enumerate(files):
+                if not asset.label_path.exists():
+                    issues.append(f"{class_name}/{asset.image_path.name}: missing label file")
+                if full:
+                    try:
+                        image = self.load_image(class_name, idx)
+                    except Exception as exc:
+                        issues.append(f"{class_name}/{asset.image_path.name}: {exc}")
+                        continue
+                    if image.ndim != 3 or image.shape[2] != 4:
+                        issues.append(f"{class_name}/{asset.image_path.name}: not RGBA")
+                if not asset.labels and asset.label_path.exists():
+                    issues.append(f"{class_name}/{asset.label_path.name}: empty label file")
+        return issues
+
+    def stats(self) -> Dict[str, Dict[str, float]]:
+        stats: Dict[str, Dict[str, float]] = {}
+        for class_name, files in self.class_files.items():
+            total_labels = sum(len(asset.labels) for asset in files)
+            total_polygons = sum(
+                1 for asset in files for label in asset.labels if label.polygon is not None
+            )
+            stats[class_name] = {
+                "files": float(len(files)),
+                "labels": float(total_labels),
+                "polygon_labels": float(total_polygons),
+            }
+        return stats

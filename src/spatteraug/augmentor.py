@@ -12,17 +12,23 @@ from .planner import build_plan
 
 
 class SpatterAugmentor:
-    def __init__(self, config: dict | str, asset_store: AssetStore) -> None:
+    def __init__(
+        self, config: dict | str, asset_store: AssetStore, enabled: bool = True
+    ) -> None:
         self.config: SpatterAugConfig = load_config(config)
         self.asset_store = asset_store
         self._epoch = 0
         self._rank = 0
+        self._enabled = bool(enabled)
 
     def set_epoch(self, epoch: int) -> None:
         self._epoch = int(epoch)
 
     def set_rank(self, rank: int) -> None:
         self._rank = int(rank)
+
+    def set_enabled(self, enabled: bool) -> None:
+        self._enabled = bool(enabled)
 
     def _make_rng(self, index: int) -> np.random.Generator:
         ss = np.random.SeedSequence([self.config.seed, self._epoch, index, self._rank])
@@ -33,6 +39,8 @@ class SpatterAugmentor:
     ) -> Tuple[np.ndarray, dict | Instances, Optional[dict]]:
         if not isinstance(image, np.ndarray):
             raise ValueError("image must be numpy array")
+        if not self._enabled:
+            return image, target, None
         rng = self._make_rng(index)
         if isinstance(target, Instances):
             instances = target

@@ -94,6 +94,8 @@ def build_plan(
                         placement_params={},
                     )
                 )
+    if config.global_cfg.strategy == "budgeted":
+        rng.shuffle(ops)
     if len(ops) > config.global_cfg.max_total_pastes:
         ops = ops[: config.global_cfg.max_total_pastes]
     return ops
