@@ -44,14 +44,14 @@ class AssetStore:
             files: List[AssetFile] = []
             for image_path in sorted(images_dir.glob("*.png")):
                 label_path = labels_dir / f"{image_path.stem}.txt"
-                labels = self._load_labels(label_path, image_path)
+                image = None
+                if self.preload_images or label_path.exists():
+                    image = self._read_image(image_path)
+                labels = self._load_labels(label_path, image, image_path)
                 files.append(AssetFile(image_path=image_path, label_path=label_path, labels=labels))
+                if self.preload_images and image is not None:
+                    self._image_cache[(class_dir.name, len(files) - 1)] = image
             self.class_files[class_dir.name] = files
-
-        if self.preload_images:
-            for class_name, files in self.class_files.items():
-                for idx, asset in enumerate(files):
-                    self._image_cache[(class_name, idx)] = self._read_image(asset.image_path)
 
     def classes(self) -> List[str]:
         return list(self.class_files.keys())
@@ -79,11 +79,14 @@ class AssetStore:
             raise ValueError(f"Asset image must be RGBA: {path}")
         return cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA)
 
-    def _load_labels(self, label_path: Path, image_path: Path) -> List[AssetLabel]:
+    def _load_labels(
+        self, label_path: Path, image: Optional[np.ndarray], image_path: Path
+    ) -> List[AssetLabel]:
         if not label_path.exists():
             return []
-        img = self._read_image(image_path)
-        h, w = img.shape[:2]
+        if image is None:
+            image = self._read_image(image_path)
+        h, w = image.shape[:2]
         labels: List[AssetLabel] = []
         with open(label_path, "r", encoding="utf-8") as f:
             for line in f:
