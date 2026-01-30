@@ -6,7 +6,7 @@ import numpy as np
 
 from .assets import AssetStore
 from .config import SpatterAugConfig, load_config
-from .executor import execute_plan
+from .executor import TransformCache, execute_plan
 from .geometry import Instances
 from .planner import build_plan
 
@@ -20,12 +20,17 @@ class SpatterAugmentor:
         }
         self._epoch = 0
         self._rank = 0
+        self._transform_cache = TransformCache()
 
     def set_epoch(self, epoch: int) -> None:
         self._epoch = int(epoch)
 
     def set_rank(self, rank: int) -> None:
         self._rank = int(rank)
+
+    def clear_caches(self) -> None:
+        self._transform_cache.clear()
+        self.asset_store.clear_torch_cache()
 
     def _make_rng(self, index: int) -> np.random.Generator:
         ss = np.random.SeedSequence([self.config.seed, self._epoch, index, self._rank])
@@ -71,6 +76,7 @@ class SpatterAugmentor:
             image,
             instances,
             plan,
+            transform_cache=self._transform_cache,
         )
         if isinstance(target, Instances):
             return out_image, out_instances, debug
