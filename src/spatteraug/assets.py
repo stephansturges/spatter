@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 
 from .geometry import polygons_from_flat
+from .torch_backend import to_torch_image, torch_available
 
 
 @dataclass
@@ -31,6 +32,7 @@ class AssetStore:
         self.preload_images = preload_images
         self.class_files: Dict[str, List[AssetFile]] = {}
         self._image_cache: Dict[Tuple[str, int], np.ndarray] = {}
+        self._torch_cache: Dict[Tuple[str, int, str], "object"] = {}
         self._scan()
 
     def _scan(self) -> None:
@@ -70,6 +72,21 @@ class AssetStore:
         if self.preload_images:
             self._image_cache[key] = image
         return image
+
+    def load_image_torch(self, class_name: str, file_id: int, device: str) -> "object":
+        if not torch_available():
+            raise RuntimeError("Torch backend requested but torch is not installed.")
+        key = (class_name, file_id, device)
+        if key in self._torch_cache:
+            return self._torch_cache[key]
+        image = self.load_image(class_name, file_id)
+        tensor = to_torch_image(image, device)
+        if self.preload_images:
+            self._torch_cache[key] = tensor
+        return tensor
+
+    def clear_torch_cache(self) -> None:
+        self._torch_cache.clear()
 
     def _read_image(self, path: Path) -> np.ndarray:
         image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)

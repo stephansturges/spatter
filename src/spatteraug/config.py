@@ -57,6 +57,14 @@ class TransformConfig:
 
 
 @dataclass
+class TransformCacheConfig:
+    enabled: bool = False
+    max_entries: int = 128
+    scale_rounding: Optional[int] = None
+    max_bytes: Optional[int] = None
+
+
+@dataclass
 class PlacementConfig:
     strategy: str = "uniform_in_bounds"
     allow_out_of_bounds: bool = False
@@ -81,6 +89,8 @@ class GlobalConfig:
     allow_overlay_overlay: bool = False
     overlay_overlay_max_iou: float = 0.01
     copy_base_image: bool = True
+    backend: str = "cpu"
+    torch_device: str = "cuda"
 
 
 @dataclass
@@ -95,6 +105,7 @@ class ClassConfig:
     transform: TransformConfig
     placement: PlacementConfig
     occlusion_override: Optional[Dict[str, Any]] = None
+    transform_cache: TransformCacheConfig = field(default_factory=TransformCacheConfig)
 
 
 @dataclass
@@ -152,6 +163,7 @@ def load_config(config: Dict[str, Any] | str) -> SpatterAugConfig:
         scale = _parse_dist(transform_cfg.get("scale", {"dist": "uniform_float", "min": 1.0, "max": 1.0}))
         transform = TransformConfig(scale=scale, hflip_p=transform_cfg.get("hflip_p", 0.0), vflip_p=transform_cfg.get("vflip_p", 0.0))
         placement = PlacementConfig(**cls_cfg.get("placement", {}))
+        transform_cache = TransformCacheConfig(**cls_cfg.get("transform_cache", {}))
         class_config = ClassConfig(
             name=name,
             assets_dir=cls_cfg["assets_dir"],
@@ -163,6 +175,7 @@ def load_config(config: Dict[str, Any] | str) -> SpatterAugConfig:
             transform=transform,
             placement=placement,
             occlusion_override=cls_cfg.get("occlusion_override"),
+            transform_cache=transform_cache,
         )
         classes_cfg[name] = class_config
 

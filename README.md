@@ -47,6 +47,7 @@ seed: 12345
 global:
   strategy: independent
   max_total_pastes: 100
+  backend: cpu
 occlusion_default:
   drop_threshold: 0.7
 classes:
@@ -70,6 +71,11 @@ classes:
         min: 0.6
         max: 1.2
       hflip_p: 0.5
+    transform_cache:
+      enabled: false
+      max_entries: 128
+      scale_rounding: null
+      max_bytes: null
     placement:
       strategy: uniform_in_bounds
 ```
@@ -77,6 +83,21 @@ classes:
 - `target_class_id` is the class id in your **training dataset** (not the asset labels).
 - `assets_dir` is the subdirectory under the assets root.
 - `apply.p` controls the probability of pasting that class on a given sample.
+- `transform_cache` optionally caches transformed overlays to skip repeated scale/flip work.
+  - `scale_rounding` (when set) quantizes sampled scales to improve cache hit rates.
+  - `max_bytes` (when set) evicts cached overlays based on approximate memory usage.
+
+### Backends
+
+SpatterAug supports a Torch backend for GPU blending when `backend: torch` is set under `global`.
+This keeps the base image and overlays in torch tensors while compositing. Torch is an optional
+dependency; if it is missing and the torch backend is requested, a runtime error is raised. Use
+`torch_device` under `global` to select a device (defaults to `cuda`).
+
+**Performance profile:** the Torch backend accelerates per-overlay blend plus scale/flip transforms,
+but the pipeline still executes overlays serially in Python. GPU blending helps most when you paste
+many large overlays, while CPU-only workloads benefit from `transform_cache` with `scale_rounding`
+to improve cache hit rates.
 
 ## Core API
 
